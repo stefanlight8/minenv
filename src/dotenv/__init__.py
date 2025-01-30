@@ -35,18 +35,22 @@ To avoid this, `getenv()` provides a way to cast the result:
 Now `max_connections` will be of type `int`.
 """
 
-from typing import Any, Callable, Final, Sequence, TypeVar, Union, overload
+from typing import Any, Callable, Final, Optional, Sequence, TextIO, TypeVar, Union, overload
 from os import PathLike, environ
 
 __all__: Sequence[str] = ("load", "load_dotenv", "get", "getenv")
 
 NO_DEFAULT: Final = ...
-DT = TypeVar("DT")  # Default Type
+DT = TypeVar("DT")  # Default value Type
 T = TypeVar("T")
 
 
 def load(
-    path: Union[str, PathLike[str]] = ".env", *, override: bool = True, verbose: bool = False
+    path: Union[str, PathLike[str]] = ".env",
+    stream: Optional[TextIO] = None,
+    *,
+    override: bool = True,
+    verbose: bool = False,
 ) -> Union[None, Exception]:
     """Load environment variables from a dotenv file.
 
@@ -54,6 +58,9 @@ def load(
     ----------
     path : str or PathLike, default=".env"
         The path to the dotenv file to be loaded.
+    stream: TextIO, optional
+        A file-like object to read from instead of opening the file at `path`.
+        If provided, `path` is ignored.
     override : bool, default=True
         Whether to override existing environment variables with values from
         the file. If `False`, existing environment variables are not overwritten.
@@ -73,24 +80,33 @@ def load(
     - Lines starting with `#` are treated as comments and are ignored.
     - Comments after a value are not supported and may cause parsing issues.
     """
+    if not path and stream is None:
+        raise ValueError("You must input path or stream to load dotenv file.")
     try:
-        with open(path, "r", encoding="UTF-8") as stream:
-            for line in stream:
-                line = line.strip()
-                if not line or line[0] == "#":
-                    continue
+        if stream is None:
+            stream = open(path, "r", encoding="UTF-8")
+        for line in stream:
+            line = line.strip()
+            if not line or line[0] == "#":
+                continue
 
-                key, value = line.split("=", 1)
-                key, value = key.strip(), value.strip().strip('"').strip("'")
+            key, value = line.split("=", 1)
+            key, value = key.strip(), value.strip().strip('"').strip("'")
 
-                if key in environ and not override:
-                    continue
+            if key in environ and not override:
+                continue
 
-                environ[key] = value
+            environ[key] = value
     except Exception as error:
         if verbose:
             raise error
         return error
+    finally:
+        if stream:
+            stream.close()
+            # we're closing stream anyway, because there's no reason
+            # to use it in other place if this is a stream of dotenv
+            # file.
 
 
 @overload
