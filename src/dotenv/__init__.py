@@ -35,7 +35,7 @@ To avoid this, `getenv()` provides a way to cast the result:
 Now `max_connections` will be of type `int`.
 """
 
-from typing import Any, Callable, Final, Sequence, TypeVar, Union
+from typing import Any, Callable, Final, Sequence, TypeVar, Union, overload
 from os import PathLike, environ
 
 __all__: Sequence[str] = ("load", "load_dotenv", "get", "getenv")
@@ -93,7 +93,15 @@ def load(
         return error
 
 
-def get(key: str, default: DT = NO_DEFAULT, into: Callable[[Any], T] = str) -> Union[T, DT]:
+@overload
+def get(key: str, *, into: Callable[[Any], T] = str) -> T: ...
+
+
+@overload
+def get(key: str, *, default: DT, into: Callable[[Any], T] = str) -> Union[T, DT]: ...
+
+
+def get(key: str, *, default: Any = NO_DEFAULT, into: Callable[[Any], T] = str) -> Union[T, Any]:
     """Get value from the environment by key.
 
     Parameters
