@@ -1,0 +1,37 @@
+line-length = 120
+fix = true
+target-version = "py38"
+
+[lint]
+preview = true
+extend-select = [
+    "I",    # isort
+    "ANN",  # flake8-annotations
+]
+select = [
+    "B",    # Bugbear rules
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "PL",   # pylint rules
+]
+exclude = [
+    "build/",
+    "dist/",
+    "docs/",
+    "__pycache__/",
+    "*.egg-info/",
+]
+
+[lint.isort]
+split-on-trailing-comma = false
+
+[format]
+docstring-code-format = true
+docstring-code-line-length = 80
+quote-style = "double"
+line-ending = "lf"
+skip-magic-trailing-comma = true
