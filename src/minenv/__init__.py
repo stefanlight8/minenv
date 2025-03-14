@@ -2,7 +2,7 @@
 
 Examples
 --------
->>> from dotenv import load_dotenv, getenv
+>>> from minenv import load_dotenv, getenv
 >>> load_dotenv()
 
 Load the dotenv file from `.env`. If any error occurs, nothing will happen.
@@ -35,23 +35,45 @@ To avoid this, `getenv()` provides a way to cast the result:
 Now `max_connections` will be of type `int`.
 """
 
-from typing import Any, Callable, Final, Optional, Sequence, TextIO, TypeVar, Union, overload
+import sys
+import typing
 from os import PathLike, environ
+
+if sys.version_info >= (3, 13):
+    from collections.abc import Callable, Iterable, Sequence
+else:
+    from typing import Callable, Iterable, Sequence
 
 __all__: Sequence[str] = ("load", "load_dotenv", "get", "getenv")
 
-NO_DEFAULT: Final = ...
-DT = TypeVar("DT")  # Default value Type
-T = TypeVar("T")
+DefaultT = typing.TypeVar("DefaultT")
+T = typing.TypeVar("T")
+
+UNDEFINED: typing.Final = ...
+QUOTES: typing.Final[typing.Set[str]] = {'"', "'"}
+
+
+def parse_stream(stream: typing.TextIO) -> Iterable[typing.Tuple[str, str]]:
+    for line in stream:
+        content = line.strip()
+        if not content or content[0] == "#" or "=" not in content:
+            continue
+
+        key, _, value = content.partition("=")
+        key, value = key.strip(), value.strip()
+        if value[1] in QUOTES and value[-1] in QUOTES:
+            value = value[1:-1]
+
+        yield key, value
 
 
 def load(
-    path: Union[str, PathLike[str]] = ".env",
-    stream: Optional[TextIO] = None,
+    path: typing.Union[str, PathLike[str]] = ".env",
+    stream: typing.Optional[typing.TextIO] = None,
     *,
     override: bool = True,
     verbose: bool = False,
-) -> Union[None, Exception]:
+) -> typing.Union[None, Exception]:
     """Load environment variables from a dotenv file.
 
     Parameters
@@ -80,44 +102,29 @@ def load(
     - Lines starting with `#` are treated as comments and are ignored.
     - Comments after a value are not supported and may cause parsing issues.
     """
-    if not path and stream is None:
-        raise ValueError("You must input path or stream to load dotenv file.")
     try:
-        if stream is None:
-            stream = open(path, "r", encoding="UTF-8")
-        for line in stream:
-            line = line.strip()
-            if not line or line[0] == "#":
-                continue
-
-            key, value = line.split("=", 1)
-            key, value = key.strip(), value.strip().strip('"').strip("'")
-
-            if key in environ and not override:
-                continue
-
-            environ[key] = value
+        with stream or open(path, encoding="UTF-8") as inner:
+            for key, value in parse_stream(inner):
+                if not override and environ.get(key):
+                    continue
+                environ[key] = value
     except Exception as error:
         if verbose:
             raise error
         return error
-    finally:
-        if stream:
-            stream.close()
-            # we're closing stream anyway, because there's no reason
-            # to use it in other place if this is a stream of dotenv
-            # file.
 
 
-@overload
-def get(key: str, *, into: Callable[[Any], T] = str) -> T: ...
+@typing.overload
+def get(key: str, *, into: Callable[[typing.Any], T] = str) -> T: ...
 
 
-@overload
-def get(key: str, *, default: DT, into: Callable[[Any], T] = str) -> Union[T, DT]: ...
+@typing.overload
+def get(key: str, *, default: DefaultT, into: Callable[[typing.Any], T] = str) -> typing.Union[T, DefaultT]: ...
 
 
-def get(key: str, *, default: Any = NO_DEFAULT, into: Callable[[Any], T] = str) -> Union[T, Any]:
+def get(
+    key: str, *, default: typing.Any = UNDEFINED, into: Callable[[typing.Any], T] = str
+) -> typing.Union[T, typing.Any]:
     """Get value from the environment by key.
 
     Parameters
@@ -135,8 +142,8 @@ def get(key: str, *, default: Any = NO_DEFAULT, into: Callable[[Any], T] = str) 
     -----
     Default value is not converting by `into`.
     """
-    value: Any = environ.get(key, default=default)
-    if value is NO_DEFAULT:
+    value: typing.Any = environ.get(key, default=default)
+    if value is UNDEFINED:
         raise KeyError(f"`{key}` cannot be found in environment")
     if value is None:
         return value
